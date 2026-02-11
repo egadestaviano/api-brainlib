@@ -1,0 +1,33 @@
+Flask==3.0.3
+Werkzeug==3.0.3
+
+# ORM
+peewee==3.17.6
+PyMySQL==1.1.1
+
+# Validation & Serialization
+marshmallow==3.21.3
+
+# Migration
+yoyo-migrations==9.0.0
+
+# API Docs
+flasgger==0.9.7.1
+
+# CORS
+flask-cors==4.0.1
+
+# Auth
+PyJWT==2.9.0
+
+# Payments
+stripe==10.12.0
+
+# Env loader
+python-dotenv==1.0.1
+
+# production runtime (WAJIB buat server)
+gunicorn==22.0.0
+
+# optional tapi sangat disarankan
+requests==2.32.3
