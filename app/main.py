@@ -3,6 +3,7 @@ import importlib
 import pkgutil
 from flask import Flask, jsonify
 from flask_cors import CORS
+from app.db import database
 
 
 from app.config import init_database_from_env
@@ -36,6 +37,15 @@ def create_app() -> Flask:
     cors_origins = os.getenv("CORS_ORIGINS", "*").split(",")
     CORS(app, supports_credentials=True, resources={r"/*": {"origins": cors_origins}})
 
+    @app.before_request
+    def _db_connect():
+        if database.is_closed():
+            database.connect(reuse_if_open=True)
+
+    @app.teardown_request
+    def _db_close(exc):
+        if not database.is_closed():
+            database.close()
 
     @app.get("/")
     def index():

@@ -1,7 +1,8 @@
 from peewee import DatabaseProxy
+from playhouse.pool import PooledMySQLDatabase
+from playhouse.shortcuts import ReconnectMixin
 
-# Initialize at runtime with the actual database instance
-# Example:
-# from peewee import SqliteDatabase
-# database.initialize(SqliteDatabase('db.sqlite3'))
+class ReconnectPooledMySQLDatabase(ReconnectMixin, PooledMySQLDatabase):
+    pass
+
 database = DatabaseProxy()

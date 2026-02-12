@@ -1,8 +1,7 @@
 import os
 from urllib.parse import urlparse
 from dotenv import load_dotenv
-from peewee import MySQLDatabase
-from app.db import database
+from app.db import database, ReconnectPooledMySQLDatabase
 
 load_dotenv()
 
@@ -33,13 +32,15 @@ def init_database_from_env() -> None:
     port = parsed.port or 3306
     user = parsed.username or "root"
     password = parsed.password or ""
-    database.initialize(MySQLDatabase(
+    database.initialize(ReconnectPooledMySQLDatabase(
         name,
         user=user,
         password=password,
         host=host,
         port=port,
         charset="utf8mb4",
+        max_connections=20,
+        stale_timeout=300,
     ))
 
 SECRET_KEY = env("SECRET_KEY", "changeme")
