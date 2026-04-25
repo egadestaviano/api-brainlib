@@ -4,6 +4,8 @@ from app.controllers.lessons.create_lesson import create_lesson_handler
 from app.controllers.lessons.read_lesson import read_lesson_handler
 from app.controllers.lessons.update_lesson import update_lesson_handler
 from app.controllers.lessons.delete_lesson import delete_lesson_handler
+from app.controllers.lessons.save_lesson_submission import save_lesson_submission_handler
+from app.controllers.lessons.get_lesson_submission import get_lesson_submission_handler
 
 
 lessons_bp = Blueprint("lessons", __name__, url_prefix="/lessons")
@@ -153,3 +155,19 @@ def delete_lesson(lesson_id: int):
         description: Not Found
     """
     return delete_lesson_handler(lesson_id)
+
+
+@lessons_bp.post("/<int:lesson_id>/submissions")
+def save_lesson_submission(lesson_id: int):
+    """
+    Save lesson submission
+    """
+    return save_lesson_submission_handler()
+
+
+@lessons_bp.get("/<int:lesson_id>/submissions/<int:user_id>")
+def get_lesson_submission(lesson_id: int, user_id: int):
+    """
+    Get lesson submission for a user
+    """
+    return get_lesson_submission_handler(lesson_id, user_id)
