@@ -69,91 +69,94 @@ def create_subscription_handler():
     if not plan:
         return jsonify({"error": "Plan not found"}), 404
 
-    # Fix: Set proper started_at and expires_at
-    now = datetime.utcnow()
-    
-    if plan.price == 0:
-        # Deactivate any previous active subscriptions for this user
-        Subscription.update(status='inactive').where(
-            (Subscription.user == user) & (Subscription.status == 'active')
-        ).execute()
+    try:
+        # Fix: Set proper started_at and expires_at
+        now = datetime.utcnow()
+        
+        if plan.price == 0:
+            # Deactivate any previous active subscriptions for this user
+            Subscription.update(status='inactive').where(
+                (Subscription.user == user) & (Subscription.status == 'active')
+            ).execute()
+
+            subscription = Subscription.create(
+                user=user,
+                plan=plan,
+                stripe_subscription_id="free",
+                payment_gateway="none",
+                status="active",
+                started_at=now,
+                expires_at=now + timedelta(days=365), # 1 year for free
+            )
+
+            return jsonify({
+                "redirect_path": f"/subscription?status=success&sub_id={subscription.id}",
+                "checkout_url": f"{FRONTEND_BASE_URL}/subscription?status=success&sub_id={subscription.id}"
+            }), 201
+
+        # Determine duration
+        duration_days = 365 if "Yearly" in plan.name else 30
 
         subscription = Subscription.create(
             user=user,
             plan=plan,
-            stripe_subscription_id="free",
-            payment_gateway="none",
-            status="active",
+            stripe_subscription_id="",
+            payment_gateway=gateway,
+            status="pending",
             started_at=now,
-            expires_at=now + timedelta(days=365), # 1 year for free
+            expires_at=now + timedelta(days=duration_days),
         )
 
+        token_payload = {"sub_id": subscription.id, "user_id": user.id}
+        token = serializer.dumps(token_payload)
+
+        if gateway == "paypal":
+            access_token = get_paypal_access_token()
+            if access_token:
+                order = create_paypal_order(plan.price, access_token)
+                order_id = order.get("id")
+                if order_id:
+                    subscription.stripe_subscription_id = order_id # Store paypal order id here for now
+                    subscription.save()
+                    
+                    # The frontend expects a 'token' in the checkout_url for PayPal Buttons
+                    checkout_url = f"https://www.sandbox.paypal.com/checkoutnow?token={order_id}"
+                    return jsonify({
+                        "redirect_path": f"/subscription?status=pending&sub_id={subscription.id}",
+                        "checkout_url": checkout_url
+                    }), 201
+
+            # Fallback if PayPal fails or not configured: 
+            # Just return a local redirect with a mock token to avoid dialog closing
+            mock_token = f"MOCK_TOKEN_{subscription.id}"
+            return jsonify({
+                "redirect_path": f"/subscription?status=success&sub_id={subscription.id}",
+                "checkout_url": f"{FRONTEND_BASE_URL}/subscription?status=success&sub_id={subscription.id}&token={mock_token}"
+            }), 201
+
+        # Default to Stripe logic
+        success_url = f"{BACKEND_BASE_URL}/api/subscriptions/checkout-success?session_id={{CHECKOUT_SESSION_ID}}&sub_id={subscription.id}&t={token}"
+        cancel_url = f"{BACKEND_BASE_URL}/api/subscriptions/checkout-cancel?sub_id={subscription.id}&t={token}"
+
+        session = stripe.checkout.Session.create(
+            payment_method_types=["card"],
+            line_items=[{"price": plan.stripe_price_id, "quantity": 1}],
+            mode="subscription",
+            success_url=success_url,
+            cancel_url=cancel_url,
+            client_reference_id=str(subscription.id),
+            customer_email=user.email,
+            metadata={"sub_id": str(subscription.id), "user_id": str(user.id)},
+        )
+
+        subscription.stripe_subscription_id = session.id
+        subscription.save()
+
+        redirect_path = f"/api/subscriptions/redirect/{subscription.id}?t={token}"
+
         return jsonify({
-            "redirect_path": f"/subscription?status=success&sub_id={subscription.id}",
-            "checkout_url": f"{FRONTEND_BASE_URL}/subscription?status=success&sub_id={subscription.id}"
+            "redirect_path": redirect_path,
+            "checkout_url": session.url
         }), 201
-
-    # Determine duration
-    duration_days = 365 if "Yearly" in plan.name else 30
-
-    subscription = Subscription.create(
-        user=user,
-        plan=plan,
-        stripe_subscription_id="",
-        payment_gateway=gateway,
-        status="pending",
-        started_at=now,
-        expires_at=now + timedelta(days=duration_days),
-    )
-
-    token_payload = {"sub_id": subscription.id, "user_id": user.id}
-    token = serializer.dumps(token_payload)
-
-    if gateway == "paypal":
-        access_token = get_paypal_access_token()
-        if access_token:
-            order = create_paypal_order(plan.price, access_token)
-            order_id = order.get("id")
-            if order_id:
-                subscription.stripe_subscription_id = order_id # Store paypal order id here for now
-                subscription.save()
-                
-                # The frontend expects a 'token' in the checkout_url for PayPal Buttons
-                checkout_url = f"https://www.sandbox.paypal.com/checkoutnow?token={order_id}"
-                return jsonify({
-                    "redirect_path": f"/subscription?status=pending&sub_id={subscription.id}",
-                    "checkout_url": checkout_url
-                }), 201
-
-        # Fallback if PayPal fails or not configured: 
-        # Just return a local redirect with a mock token to avoid dialog closing
-        mock_token = f"MOCK_TOKEN_{subscription.id}"
-        return jsonify({
-            "redirect_path": f"/subscription?status=success&sub_id={subscription.id}",
-            "checkout_url": f"{FRONTEND_BASE_URL}/subscription?status=success&sub_id={subscription.id}&token={mock_token}"
-        }), 201
-
-    # Default to Stripe logic
-    success_url = f"{BACKEND_BASE_URL}/api/subscriptions/checkout-success?session_id={{CHECKOUT_SESSION_ID}}&sub_id={subscription.id}&t={token}"
-    cancel_url = f"{BACKEND_BASE_URL}/api/subscriptions/checkout-cancel?sub_id={subscription.id}&t={token}"
-
-    session = stripe.checkout.Session.create(
-        payment_method_types=["card"],
-        line_items=[{"price": plan.stripe_price_id, "quantity": 1}],
-        mode="subscription",
-        success_url=success_url,
-        cancel_url=cancel_url,
-        client_reference_id=str(subscription.id),
-        customer_email=user.email,
-        metadata={"sub_id": str(subscription.id), "user_id": str(user.id)},
-    )
-
-    subscription.stripe_subscription_id = session.id
-    subscription.save()
-
-    redirect_path = f"/api/subscriptions/redirect/{subscription.id}?t={token}"
-
-    return jsonify({
-        "redirect_path": redirect_path,
-        "checkout_url": session.url
-    }), 201
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
