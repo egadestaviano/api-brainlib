@@ -26,10 +26,20 @@ class Subscription(BaseModel):
     id = AutoField()
     user = ForeignKeyField(User, backref="subscriptions", on_delete="CASCADE")
     plan = ForeignKeyField(Plan, backref="subscriptions", on_delete="CASCADE")
-    stripe_subscription_id = CharField(max_length=128)
+    stripe_subscription_id = CharField(max_length=128, null=True)
+    payment_gateway = CharField(max_length=32, default="stripe")
     status = CharField(max_length=64, default="active")
     started_at = DateTimeField(default=datetime.utcnow)
-    expires_at = DateTimeField()
+    expires_at = DateTimeField(null=True)
 
     class Meta:
         table_name = "subscriptions"
+
+
+class AIUsage(BaseModel):
+    id = AutoField()
+    user = ForeignKeyField(User, backref="ai_usages", on_delete="CASCADE")
+    used_at = DateTimeField(default=datetime.utcnow)
+
+    class Meta:
+        table_name = "ai_usages"

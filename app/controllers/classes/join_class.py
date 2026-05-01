@@ -33,6 +33,11 @@ def join_class_by_code_handler():
     if existing:
         return jsonify({"error": "You are already a member of this class"}), 409
 
+    from app.utils.subscription_limits import check_student_limit
+    allowed, err_resp, status_code = check_student_limit(lms_class.id, lms_class.creator.id)
+    if not allowed:
+        return err_resp, status_code
+
     try:
         membership = ClassMembership.create(
             class_ref=lms_class.id,

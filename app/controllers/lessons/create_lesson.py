@@ -28,6 +28,11 @@ def create_lesson_handler():
         return jsonify({"error": "class not found"}), 404
     if not User.get_or_none(User.id == author_id):
         return jsonify({"error": "author not found"}), 404
+    
+    from app.utils.subscription_limits import check_lesson_limit
+    allowed, err_resp, status_code = check_lesson_limit(class_id, author_id)
+    if not allowed:
+        return err_resp, status_code
 
     if content_json is not None:
         if isinstance(content_json, str):

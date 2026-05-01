@@ -1,7 +1,8 @@
 import os
 from urllib.parse import urlparse
 from dotenv import load_dotenv
-from app.db import database, ReconnectPooledMySQLDatabase
+from peewee import MySQLDatabase
+from app.db import database
 
 load_dotenv()
 
@@ -32,15 +33,13 @@ def init_database_from_env() -> None:
     port = parsed.port or 3306
     user = parsed.username or "root"
     password = parsed.password or ""
-    database.initialize(ReconnectPooledMySQLDatabase(
+    database.initialize(MySQLDatabase(
         name,
         user=user,
         password=password,
         host=host,
         port=port,
         charset="utf8mb4",
-        max_connections=20,
-        stale_timeout=300,
     ))
 
 SECRET_KEY = env("SECRET_KEY", "changeme")
@@ -48,6 +47,9 @@ SECRET_KEY = env("SECRET_KEY", "changeme")
 STRIPE_SECRET_KEY = env("STRIPE_SECRET_KEY")
 STRIPE_PUBLIC_KEY = env("STRIPE_PUBLIC_KEY")
 STRIPE_WEBHOOK_SECRET = env("STRIPE_WEBHOOK_SECRET")
+PAYPAL_CLIENT_ID = env("PAYPAL_CLIENT_ID")
+PAYPAL_SECRET = env("PAYPAL_SECRET")
+PAYPAL_MODE = env("PAYPAL_MODE", "sandbox")
 
 MAIL_HOST = env("MAIL_HOST", "smtp.gmail.com")
 MAIL_PORT = int(env("MAIL_PORT", "587"))

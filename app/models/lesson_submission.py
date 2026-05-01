@@ -2,13 +2,13 @@ from peewee import (
     Model,
     AutoField,
     TextField,
+    IntegerField,
     DateTimeField,
     ForeignKeyField,
 )
 from app.db import database
 from app.models.lesson import Lesson
 from app.models.user import User
-from datetime import datetime
 
 class BaseModel(Model):
     class Meta:
@@ -16,12 +16,14 @@ class BaseModel(Model):
 
 class LessonSubmission(BaseModel):
     id = AutoField()
-    lesson = ForeignKeyField(Lesson, backref='lesson_submissions', on_delete='CASCADE', on_update='CASCADE', column_name='lesson_id')
+    lesson = ForeignKeyField(Lesson, backref='submissions', on_delete='CASCADE', on_update='CASCADE', column_name='lesson_id')
     user = ForeignKeyField(User, backref='lesson_submissions', on_delete='CASCADE', on_update='CASCADE', column_name='user_id')
-    answers_json = TextField(null=True)
-    submitted_at = DateTimeField(null=True)
-    created_at = DateTimeField(default=datetime.now)
-    updated_at = DateTimeField(default=datetime.now)
+    results_json = TextField()
+    score_correct = IntegerField(default=0)
+    score_wrong = IntegerField(default=0)
+    submitted_at = DateTimeField()
+    created_at = DateTimeField()
+    updated_at = DateTimeField()
 
     class Meta:
         table_name = "lesson_submissions"

@@ -14,6 +14,7 @@ class SubscriptionSchema(Schema):
     user_id = fields.Int(attribute="user.id")
     plan = fields.Nested(PlanSchema)
     stripe_subscription_id = fields.Str()
+    payment_gateway = fields.Str()
     status = fields.Str()
     started_at = fields.DateTime()
     expires_at = fields.DateTime()

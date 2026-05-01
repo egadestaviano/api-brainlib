@@ -38,13 +38,13 @@ def create_app():
   # CLI command seed plans
     @app.cli.command("seed-plans")
     def seed_plans_cmd():
-        """Seed default subscription plans (Free, Pro, Business)."""
+        """Seed default subscription plans (Starter, Medium, Enterprise)."""
         from app.db import database
         if database.is_closed():
             database.connect()
         seed_plans()
         if not database.is_closed():
             database.close()
-        click.echo("✅ Subscription plans seeded (Free, Pro, Business).")
+        click.echo("✅ Subscription plans seeded (Starter, Medium, Enterprise).")
 
     return app

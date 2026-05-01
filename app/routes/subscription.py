@@ -8,6 +8,8 @@ from app.controllers.subscriptions.read_current_subscription_handler import read
 from app.controllers.subscriptions.redirect_to_stripe import redirect_to_stripe_handler
 from app.controllers.subscriptions.checkout_success import checkout_success_handler
 from app.controllers.subscriptions.checkout_cancel import checkout_cancel_handler
+from app.controllers.subscriptions.record_ai_usage_handler import record_ai_usage_handler
+
 
 subscription_bp = Blueprint("subscriptions", __name__, url_prefix="/subscriptions")
 
@@ -183,3 +185,50 @@ def checkout_cancel():
         description: Redirect ke halaman gagal di FE
     """
     return checkout_cancel_handler()
+    
+@subscription_bp.post("/paypal-capture")
+def paypal_capture():
+    """
+    Capture PayPal Order
+    ---
+    tags:
+      - Subscriptions
+    consumes:
+      - application/json
+    parameters:
+      - in: body
+        name: body
+        required: true
+        schema:
+          type: object
+          required:
+            - order_id
+            - sub_id
+          properties:
+            order_id:
+              type: string
+            sub_id:
+              type: integer
+    responses:
+      200:
+        description: OK
+    """
+    from app.controllers.subscriptions.paypal_capture import paypal_capture_handler
+    return paypal_capture_handler()
+
+
+@subscription_bp.post("/record-ai-usage")
+def record_ai_usage():
+    """
+    Record AI usage for the current user
+    ---
+    tags:
+      - Subscriptions
+    responses:
+      200:
+        description: OK
+      403:
+        description: Limit reached
+    """
+    return record_ai_usage_handler()
+

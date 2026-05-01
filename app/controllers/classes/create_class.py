@@ -28,7 +28,10 @@ def create_class_handler():
     errors = create_schema.validate(json_data)
     if errors:
         return jsonify({"errors": errors}), 400
-
+    from app.utils.subscription_limits import check_class_creation_limit
+    allowed, err_resp, status_code = check_class_creation_limit(user.id)
+    if not allowed:
+        return err_resp, status_code
     try:
         new_class = LmsClass.create(
             title=json_data["title"],

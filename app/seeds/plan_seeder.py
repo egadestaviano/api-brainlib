@@ -4,22 +4,22 @@ from decimal import Decimal
 def seed_plans():
     plans_data = [
         {
-            "name": "Free",
+            "name": "Starter",
             "stripe_price_id": "free",
-            "description": "Free plan for beginners. Access to basic features.",
+            "description": "Perfect for individual educators getting started.",
             "price": Decimal("0.00"),
         },
         {
-            "name": "Pro",
-            "stripe_price_id": "price_1SKFOM4JZMFfFZZO5VagDuar",
-            "description": "Pro plan with full feature access.",
-            "price": Decimal("99.00"),
+            "name": "Medium",
+            "stripe_price_id": "price_medium",
+            "description": "For growing teams and institutions.",
+            "price": Decimal("10.00"),
         },
         {
-            "name": "Business",
-            "stripe_price_id": "price_1SKFPw4JZMFfFZZOVYSZx3H2",
-            "description": "Business plan with advanced features and priority support.",
-            "price": Decimal("299.00"),
+            "name": "Enterprise",
+            "stripe_price_id": "price_enterprise",
+            "description": "Unlimited power for large organizations.",
+            "price": Decimal("20.00"),
         },
     ]
 

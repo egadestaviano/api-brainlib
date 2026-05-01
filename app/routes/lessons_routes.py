@@ -4,8 +4,6 @@ from app.controllers.lessons.create_lesson import create_lesson_handler
 from app.controllers.lessons.read_lesson import read_lesson_handler
 from app.controllers.lessons.update_lesson import update_lesson_handler
 from app.controllers.lessons.delete_lesson import delete_lesson_handler
-from app.controllers.lessons.save_lesson_submission import save_lesson_submission_handler
-from app.controllers.lessons.get_lesson_submission import get_lesson_submission_handler
 
 
 lessons_bp = Blueprint("lessons", __name__, url_prefix="/lessons")
@@ -138,36 +136,22 @@ def update_lesson(lesson_id: int):
 
 @lessons_bp.delete("/<int:lesson_id>")
 def delete_lesson(lesson_id: int):
-    """
-    Delete lesson
-    ---
-    tags:
-      - Lessons
-    parameters:
-      - in: path
-        name: lesson_id
-        type: integer
-        required: true
-    responses:
-      200:
-        description: OK
-      404:
-        description: Not Found
-    """
     return delete_lesson_handler(lesson_id)
 
 
-@lessons_bp.post("/<int:lesson_id>/submissions")
-def save_lesson_submission(lesson_id: int):
-    """
-    Save lesson submission
-    """
-    return save_lesson_submission_handler()
+@lessons_bp.post("/<int:lesson_id>/submit")
+def submit_lesson(lesson_id: int):
+    from app.controllers.lessons.submit_lesson import submit_lesson_handler
+    return submit_lesson_handler(lesson_id)
 
 
-@lessons_bp.get("/<int:lesson_id>/submissions/<int:user_id>")
-def get_lesson_submission(lesson_id: int, user_id: int):
-    """
-    Get lesson submission for a user
-    """
-    return get_lesson_submission_handler(lesson_id, user_id)
+@lessons_bp.get("/<int:lesson_id>/submission")
+def get_lesson_submission(lesson_id: int):
+    from app.controllers.lessons.submit_lesson import get_lesson_submission_handler
+    return get_lesson_submission_handler(lesson_id)
+
+
+@lessons_bp.get("/<int:lesson_id>/submissions")
+def list_lesson_submissions(lesson_id: int):
+    from app.controllers.lessons.submit_lesson import list_lesson_submissions_handler
+    return list_lesson_submissions_handler(lesson_id)
