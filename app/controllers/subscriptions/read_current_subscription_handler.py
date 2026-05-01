@@ -10,45 +10,48 @@ def read_current_subscription_handler():
     if error:
         return error
 
-    subscription = (
-        Subscription
-        .select(Subscription, Plan, User)
-        .join(Plan, on=(Subscription.plan == Plan.id))
-        .join(User, on=(Subscription.user == User.id))
-        .where(
-            (Subscription.user == user.id) &
-            (Subscription.status == "active")
+    try:
+        subscription = (
+            Subscription
+            .select(Subscription, Plan, User)
+            .join(Plan, on=(Subscription.plan == Plan.id))
+            .join(User, on=(Subscription.user == User.id))
+            .where(
+                (Subscription.user == user.id) &
+                (Subscription.status == "active")
+            )
+            .order_by(Subscription.started_at.desc())
+            .first()
         )
-        .order_by(Subscription.started_at.desc())
-        .first()
-    )
 
-    if not subscription:
-        return jsonify({"subscription": None, "message": "No active subscription"}), 200
+        if not subscription:
+            return jsonify({"subscription": None, "message": "No active subscription"}), 200
 
-    # Get limits
-    limits = get_user_plan_limits(user.id)
-    
-    # Get current usage
-    now = datetime.utcnow()
-    first_day_of_month = datetime(now.year, now.month, 1)
-    
-    current_usage = AIUsage.select().where(
-        (AIUsage.user == user.id) & 
-        (AIUsage.used_at >= first_day_of_month)
-    ).count()
+        # Get limits
+        limits = get_user_plan_limits(user.id)
+        
+        # Get current usage
+        now = datetime.utcnow()
+        first_day_of_month = datetime(now.year, now.month, 1)
+        
+        current_usage = AIUsage.select().where(
+            (AIUsage.user == user.id) & 
+            (AIUsage.used_at >= first_day_of_month)
+        ).count()
 
-    return jsonify({
-        "id": subscription.id,
-        "user_id": subscription.user.id,
-        "user_email": subscription.user.email,
-        "plan_id": subscription.plan.id,
-        "plan_name": subscription.plan.name,
-        "plan_price": str(subscription.plan.price),
-        "status": subscription.status,
-        "started_at": subscription.started_at.isoformat(),
-        "expires_at": subscription.expires_at.isoformat(),
-        "ai_usage": current_usage,
-        "ai_limit": limits["max_ai"]
-    }), 200
+        return jsonify({
+            "id": subscription.id,
+            "user_id": subscription.user.id,
+            "user_email": subscription.user.email,
+            "plan_id": subscription.plan.id,
+            "plan_name": subscription.plan.name,
+            "plan_price": str(subscription.plan.price),
+            "status": subscription.status,
+            "started_at": subscription.started_at.isoformat() if subscription.started_at else None,
+            "expires_at": subscription.expires_at.isoformat() if subscription.expires_at else None,
+            "ai_usage": current_usage,
+            "ai_limit": limits["max_ai"]
+        }), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
