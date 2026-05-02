@@ -37,41 +37,41 @@ def get_user_plan_limits(user_id):
 def check_class_creation_limit(user_id):
     limits = get_user_plan_limits(user_id)
     if limits["max_classes"] == -1:
-        return True, None
+        return True, None, None
     
     current_count = LmsClass.select().where(LmsClass.creator == user_id).count()
     if current_count >= limits["max_classes"]:
         return False, jsonify({"error": f"Class creation limit reached ({limits['max_classes']}). Please upgrade your plan."}), 403
     
-    return True, None
+    return True, None, None
 
 def check_student_limit(class_id, creator_id):
     limits = get_user_plan_limits(creator_id)
     if limits["max_students"] == -1:
-        return True, None
+        return True, None, None
     
     current_count = ClassMembership.select().where(ClassMembership.class_ref == class_id).count()
     if current_count >= limits["max_students"]:
         return False, jsonify({"error": f"Student limit reached for this class ({limits['max_students']}). Creator needs to upgrade their plan."}), 403
     
-    return True, None
+    return True, None, None
 
 def check_lesson_limit(class_id, creator_id):
     limits = get_user_plan_limits(creator_id)
     if limits["max_lessons"] == -1:
-        return True, None
+        return True, None, None
     
     current_count = Lesson.select().where(Lesson.class_id == class_id).count()
     if current_count >= limits["max_lessons"]:
         return False, jsonify({"error": f"Lesson limit reached for this class ({limits['max_lessons']}). Please upgrade your plan."}), 403
     
-    return True, None
+    return True, None, None
 
 def check_ai_limit(user_id):
     from app.models.subscription import AIUsage
     limits = get_user_plan_limits(user_id)
     if limits["max_ai"] == -1:
-        return True, None
+        return True, None, None
     
     # Check usage for the current month
     now = datetime.utcnow()
@@ -85,7 +85,7 @@ def check_ai_limit(user_id):
     if current_usage >= limits["max_ai"]:
         return False, jsonify({"error": f"AI generation limit reached for this month ({limits['max_ai']}). Please upgrade your plan."}), 403
     
-    return True, None
+    return True, None, None
 
 def record_ai_usage(user_id):
     from app.models.subscription import AIUsage
