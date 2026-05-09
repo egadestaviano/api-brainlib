@@ -8,9 +8,9 @@ def record_ai_usage_handler():
         return error
 
     # Check limit
-    allowed, response_error = check_ai_limit(user.id)
+    allowed, err_resp, status_code = check_ai_limit(user.id)
     if not allowed:
-        return response_error
+        return err_resp, status_code
 
     # Record usage
     record_ai_usage(user.id)
