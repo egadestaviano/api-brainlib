@@ -1,10 +1,11 @@
 from flask import jsonify
 from app.models.lms_class import LmsClass
+from app.models.user import User, Role, UserRole
 from app.models.class_membership import ClassMembership
 from app.models.user_profile import UserProfile
 from app.schemas.lms_class import ClassListSchema
 from app.utils.auth import get_user_from_token
-from peewee import fn
+from peewee import fn, JOIN
 
 list_schema = ClassListSchema(many=True)
 
@@ -13,21 +14,29 @@ def read_my_class_handler():
     if error:
         return error
 
-    creator_query = LmsClass.select().where(LmsClass.creator == user)
+    # Check if user is admin
+    is_admin = False
+    try:
+        admin_role = Role.get(Role.name == 'admin')
+        is_admin = UserRole.select().where((UserRole.user == user) & (UserRole.role == admin_role)).exists()
+    except Role.DoesNotExist:
+        pass
 
-    member_query = (
-        LmsClass
-        .select(LmsClass)
-        .join(ClassMembership, on=(ClassMembership.class_ref == LmsClass.id))
-        .where(
-            (ClassMembership.user == user) &
-            (ClassMembership.is_active == True)
+    if is_admin:
+        classes = LmsClass.select()
+    else:
+        creator_query = LmsClass.select().where(LmsClass.creator == user)
+        member_query = (
+            LmsClass
+            .select(LmsClass)
+            .join(ClassMembership, on=(ClassMembership.class_ref == LmsClass.id))
+            .where(
+                (ClassMembership.user == user) &
+                (ClassMembership.is_active == True)
+            )
         )
-    )
-
-    class_ids = set([c.id for c in creator_query] + [c.id for c in member_query])
-
-    classes = LmsClass.select().where(LmsClass.id.in_(class_ids))
+        class_ids = set([c.id for c in creator_query] + [c.id for c in member_query])
+        classes = LmsClass.select().where(LmsClass.id.in_(class_ids))
 
     classes_with_creator = []
     for cls in classes:
