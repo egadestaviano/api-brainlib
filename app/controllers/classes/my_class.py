@@ -2,10 +2,11 @@ from flask import jsonify
 from app.models.lms_class import LmsClass
 from app.models.user import User, Role, UserRole
 from app.models.class_membership import ClassMembership
+from app.models.lesson import Lesson
 from app.models.user_profile import UserProfile
 from app.schemas.lms_class import ClassListSchema
 from app.utils.auth import get_user_from_token
-from peewee import fn, JOIN
+from peewee import fn, JOIN, prefetch
 
 list_schema = ClassListSchema(many=True)
 
@@ -15,15 +16,11 @@ def read_my_class_handler():
         return error
 
     # Check if user is admin
-    is_admin = False
-    try:
-        admin_role = Role.get(Role.name == 'admin')
-        is_admin = UserRole.select().where((UserRole.user == user) & (UserRole.role == admin_role)).exists()
-    except Role.DoesNotExist:
-        pass
+    user_roles = [ur.role.name.lower() for ur in user.roles]
+    is_admin = 'admin' in user_roles
 
     if is_admin:
-        classes = LmsClass.select()
+        classes_query = LmsClass.select().order_by(LmsClass.id.desc())
     else:
         creator_query = LmsClass.select().where(LmsClass.creator == user)
         member_query = (
@@ -36,17 +33,18 @@ def read_my_class_handler():
             )
         )
         class_ids = set([c.id for c in creator_query] + [c.id for c in member_query])
-        classes = LmsClass.select().where(LmsClass.id.in_(class_ids))
+        classes_query = LmsClass.select().where(LmsClass.id.in_(class_ids)).order_by(LmsClass.id.desc())
 
-    classes_with_creator = []
+    # Prefetch creator and their profile
+    classes = prefetch(
+        classes_query,
+        User.select().join(UserProfile, JOIN.LEFT_OUTER),
+        UserProfile.select()
+    )
+
+    classes_with_data = []
     for cls in classes:
-        creator = cls.creator
-        try:
-            profile_obj = UserProfile.get(UserProfile.user == creator.id)
-            setattr(creator, "profile", [profile_obj])
-        except UserProfile.DoesNotExist:
-            setattr(creator, "profile", [])
-
+        # member_count
         member_count = (
             ClassMembership
             .select(fn.COUNT(ClassMembership.id))
@@ -58,8 +56,17 @@ def read_my_class_handler():
         )
         setattr(cls, "member_count", member_count)
 
-        classes_with_creator.append(cls)
+        # lesson_count
+        lesson_count = (
+            Lesson
+            .select(fn.COUNT(Lesson.id))
+            .where(Lesson.class_ref == cls.id)
+            .scalar() or 0
+        )
+        setattr(cls, "lesson_count", lesson_count)
+
+        classes_with_data.append(cls)
 
     return jsonify({
-        "data": list_schema.dump(classes_with_creator),
+        "data": list_schema.dump(classes_with_data),
     })

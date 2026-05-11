@@ -21,6 +21,7 @@ class ClassListSchema(Schema):
     updated_at = fields.DateTime(dump_only=True)
     creator = fields.Nested(UserSchema, dump_only=True)
     member_count = fields.Int()
+    lesson_count = fields.Int()
 
 
 class ClassDetailSchema(ClassListSchema):
