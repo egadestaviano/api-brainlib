@@ -61,6 +61,7 @@ def create_subscription_handler():
     payload = request.get_json(silent=True) or {}
     plan_id = payload.get("plan_id")
     gateway = payload.get("gateway", "stripe") # 'stripe' or 'paypal'
+    custom_price = payload.get("custom_price") # Optional custom price override
 
     if not plan_id:
         return jsonify({"error": "plan_id is required"}), 400
@@ -73,7 +74,16 @@ def create_subscription_handler():
         # Fix: Set proper started_at and expires_at
         now = datetime.utcnow()
         
-        if plan.price == 0:
+        # Determine the price to charge: use custom_price if provided, otherwise default to plan.price
+        from decimal import Decimal
+        tx_price = plan.price
+        if custom_price is not None:
+            try:
+                tx_price = Decimal(str(custom_price))
+            except Exception:
+                pass
+
+        if tx_price == 0:
             # Deactivate any previous active subscriptions for this user
             Subscription.update(status='inactive').where(
                 (Subscription.user == user) & (Subscription.status == 'active')
@@ -107,13 +117,17 @@ def create_subscription_handler():
             expires_at=now + timedelta(days=duration_days),
         )
 
-        token_payload = {"sub_id": subscription.id, "user_id": user.id}
+        token_payload = {
+            "sub_id": subscription.id,
+            "user_id": user.id,
+            "custom_price": float(tx_price)
+        }
         token = serializer.dumps(token_payload)
 
         if gateway == "paypal":
             access_token = get_paypal_access_token()
             if access_token:
-                order = create_paypal_order(plan.price, access_token)
+                order = create_paypal_order(tx_price, access_token)
                 order_id = order.get("id")
                 if order_id:
                     subscription.stripe_subscription_id = order_id # Store paypal order id here for now
@@ -138,25 +152,58 @@ def create_subscription_handler():
         success_url = f"{BACKEND_BASE_URL}/api/subscriptions/checkout-success?session_id={{CHECKOUT_SESSION_ID}}&sub_id={subscription.id}&t={token}"
         cancel_url = f"{BACKEND_BASE_URL}/api/subscriptions/checkout-cancel?sub_id={subscription.id}&t={token}"
 
-        session = stripe.checkout.Session.create(
-            payment_method_types=["card"],
-            line_items=[{"price": plan.stripe_price_id, "quantity": 1}],
-            mode="subscription",
-            success_url=success_url,
-            cancel_url=cancel_url,
-            client_reference_id=str(subscription.id),
-            customer_email=user.email,
-            metadata={"sub_id": str(subscription.id), "user_id": str(user.id)},
-        )
+        try:
+            # Determine recurring billing interval (monthly/yearly)
+            interval = "year" if "Yearly" in plan.name else "month"
 
-        subscription.stripe_subscription_id = session.id
-        subscription.save()
+            session = stripe.checkout.Session.create(
+                payment_method_types=["card"],
+                line_items=[{
+                    "price_data": {
+                        "currency": "usd",
+                        "product_data": {
+                            "name": f"Brainlib {plan.name} Plan",
+                            "description": plan.description or f"Subscription to the {plan.name} plan.",
+                        },
+                        "unit_amount": int(tx_price * 100),  # price in cents (e.g. $10.00 -> 1000)
+                        "recurring": {
+                            "interval": interval,
+                        },
+                    },
+                    "quantity": 1,
+                }],
+                mode="subscription",
+                success_url=success_url,
+                cancel_url=cancel_url,
+                client_reference_id=str(subscription.id),
+                customer_email=user.email,
+                metadata={"sub_id": str(subscription.id), "user_id": str(user.id)},
+            )
 
-        redirect_path = f"/api/subscriptions/redirect/{subscription.id}?t={token}"
+            subscription.stripe_subscription_id = session.id
+            subscription.save()
 
-        return jsonify({
-            "redirect_path": redirect_path,
-            "checkout_url": session.url
-        }), 201
+            redirect_path = f"/api/subscriptions/redirect/{subscription.id}?t={token}"
+
+            return jsonify({
+                "redirect_path": redirect_path,
+                "checkout_url": session.url
+            }), 201
+        except Exception as stripe_err:
+            stripe_err_str = str(stripe_err)
+            if STRIPE_SECRET_KEY == "sk_test_xxx" or "Invalid API Key" in stripe_err_str or "No API key" in stripe_err_str or "api key" in stripe_err_str.lower():
+                # Fallback to Mock Stripe Checkout for development
+                subscription.status = "pending"
+                subscription.stripe_subscription_id = f"mock_stripe_{subscription.id}"
+                subscription.save()
+                
+                mock_checkout_url = f"{BACKEND_BASE_URL}/api/subscriptions/mock-checkout/{subscription.id}?t={token}"
+                redirect_path = f"/api/subscriptions/mock-checkout/{subscription.id}?t={token}"
+
+                return jsonify({
+                    "redirect_path": redirect_path,
+                    "checkout_url": mock_checkout_url
+                }), 201
+            raise stripe_err
     except Exception as e:
         return jsonify({"error": str(e)}), 500

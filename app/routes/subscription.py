@@ -137,6 +137,30 @@ def redirect_to_stripe(sub_id):
     return redirect_to_stripe_handler(sub_id)
 
 
+@subscription_bp.get("/mock-checkout/<sub_id>")
+def mock_checkout(sub_id):
+    """
+    Mock Stripe Checkout page
+    ---
+    tags:
+      - Subscriptions
+    parameters:
+      - in: path
+        name: sub_id
+        required: true
+        type: integer
+      - in: query
+        name: t
+        required: true
+        type: string
+    responses:
+      200:
+        description: Mock Payment HTML page
+    """
+    from app.controllers.subscriptions.mock_checkout import mock_checkout_handler
+    return mock_checkout_handler(sub_id)
+
+
 @subscription_bp.get("/checkout-success")
 def checkout_success():
     """
