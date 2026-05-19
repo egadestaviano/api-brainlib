@@ -7,6 +7,7 @@ PyMySQL==1.1.1
 
 # Validation & Serialization
 marshmallow==3.21.3
+cryptography
 
 # Migration
 yoyo-migrations==9.0.0
