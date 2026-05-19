@@ -1,4 +1,5 @@
 from flask import request, jsonify
+import datetime
 
 from app.models.user_profile import UserProfile
 from app.schemas.user_profile import UserProfileSchema
@@ -17,5 +18,6 @@ def update_user_profile_handler(profile_id):
         if field in payload:
             setattr(profile, field, payload.get(field))
 
+    profile.updated_at = datetime.datetime.utcnow()
     profile.save()
     return jsonify(schema.dump(profile))

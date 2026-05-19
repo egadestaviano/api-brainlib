@@ -78,40 +78,47 @@ def list_lesson_submissions_handler(lesson_id):
     
     from app.models.user import User
     from app.models.user_profile import UserProfile
-    from peewee import JOIN
 
-    # Join User and UserProfile to get names efficiently
+    # Fetch submissions with user join
     submissions = (LessonSubmission
-                  .select(LessonSubmission, User, UserProfile)
+                  .select(LessonSubmission, User)
                   .join(User, on=(LessonSubmission.user == User.id))
-                  .join(UserProfile, JOIN.LEFT_OUTER, on=(User.id == UserProfile.user))
                   .where(LessonSubmission.lesson == lesson_id))
     
+    # Fetch profiles to avoid N+1 queries and avoid join bugs
+    user_ids = [s.user_id for s in submissions]
+    profiles = {}
+    if user_ids:
+        try:
+            profile_list = UserProfile.select().where(UserProfile.user_id.in_(user_ids))
+            for p in profile_list:
+                if p.display_name:
+                    profiles[p.user_id] = p.display_name
+        except Exception as e:
+            print(f"WARNING: failed to fetch profiles: {str(e)}")
+
     data = []
     for s in submissions:
-        # Robust name detection
-        display_name = s.user.email
-        try:
-            # Peewee models with joins might have the related object attached
-            if hasattr(s.user, 'user_profile'):
-                profile = s.user.user_profile
-                if profile and profile.display_name:
-                    display_name = profile.display_name
-            elif hasattr(s.user, 'profile'): # Check our other backref name
-                profile = s.user.profile
-                if profile and profile.display_name:
-                    display_name = profile.display_name
-        except:
-            pass
+        display_name = profiles.get(s.user_id) or (s.user.email if s.user else "Unknown Student")
+        
+        submitted_at_str = None
+        if s.submitted_at:
+            if isinstance(s.submitted_at, str):
+                submitted_at_str = s.submitted_at
+            elif hasattr(s.submitted_at, 'isoformat'):
+                submitted_at_str = s.submitted_at.isoformat()
+            else:
+                submitted_at_str = str(s.submitted_at)
 
         data.append({
             "id": s.id,
-            "user_id": s.user.id,
+            "user_id": s.user_id,
             "user_name": display_name,
             "score_correct": s.score_correct,
             "score_wrong": s.score_wrong,
-            "submitted_at": s.submitted_at.isoformat() if s.submitted_at else None
+            "submitted_at": submitted_at_str
         })
     
     return jsonify({"data": data}), 200
+
 

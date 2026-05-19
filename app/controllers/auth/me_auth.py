@@ -24,9 +24,25 @@ def me_user_handler():
     permissions = [rp.permission.name for rp in role_perms]
     
     # profile
+    if not profile:
+        from app.models.user_profile import UserProfile
+        import datetime
+        try:
+            now = datetime.datetime.utcnow()
+            profile = UserProfile.create(
+                user=user,
+                display_name=user.email.split("@")[0],
+                bio="",
+                created_at=now,
+                updated_at=now
+            )
+        except Exception as e:
+            logging.error(f"Failed to create profile for user {user.id}: {e}")
+
     data = user_schema.dump(user)
     if profile:
         data["profile"] = {
+            "id": profile.id,
             "display_name": profile.display_name,
             "avatar_file_id": profile.avatar_file_id,
             "bio": profile.bio,

@@ -241,18 +241,5 @@ def paypal_capture():
     return paypal_capture_handler()
 
 
-@subscription_bp.post("/record-ai-usage")
-def record_ai_usage():
-    """
-    Record AI usage for the current user
-    ---
-    tags:
-      - Subscriptions
-    responses:
-      200:
-        description: OK
-      403:
-        description: Limit reached
-    """
-    return record_ai_usage_handler()
+
 
