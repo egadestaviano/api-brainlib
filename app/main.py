@@ -1,10 +1,9 @@
-import os
+﻿import os
 import importlib
 import pkgutil
 from flask import Flask, jsonify
 from flask_cors import CORS
 from app.db import database
-
 
 from app.config import init_database_from_env
 
@@ -51,9 +50,21 @@ def create_app() -> Flask:
     def index():
         return jsonify({"status": "error", "code": 401})
 
-    @app.get("/health")
+    @app.get("/api/health")
     def health():
-        return jsonify({"status": "ok"})
+        database_ok = False
+        try:
+            if database.is_closed():
+                database.connect(reuse_if_open=True)
+            database.execute_sql("SELECT 1")
+            database_ok = True
+        except Exception:
+            database_ok = False
+        finally:
+            if not database.is_closed():
+                database.close()
+
+        return jsonify({"status": "ok" if database_ok else "degraded", "api": True, "database": database_ok})
 
     routes_path = os.path.join(os.path.dirname(__file__), "routes")
     register_blueprints(app, "app.routes", routes_path, url_prefix="/api")
